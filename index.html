@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Käärijä - The Green Hero Adventure</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #87CEEB 0%, #98FB98 100%);
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        .game-container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #2E8B57;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+        
+        #gameCanvas {
+            border: 3px solid #2E8B57;
+            border-radius: 10px;
+            background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 100%);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .controls {
+            margin-top: 15px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .score {
+            font-size: 18px;
+            color: #2E8B57;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        
+        .audio-info {
+            margin-top: 10px;
+            padding: 8px;
+            background: rgba(46, 139, 87, 0.1);
+            border-radius: 8px;
+            font-size: 12px;
+            color: #2E8B57;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🎵 Käärijä 🎵</h1>
+        <div class="subtitle">Help the Green Hero collect emeralds and reach the huge emerald!</div>
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+        <div class="score" id="score">Level: 1 | Score: 0 | Lives: 3</div>
+        <div class="controls">
+            <strong>Controls:</strong> Arrow Keys to move, Space to jump
+        </div>
+        <div class="audio-info">
+            🎵 <strong>Audio:</strong> Press 'M' to mute/unmute | Enjoy the groovy beats!
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
