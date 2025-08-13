@@ -102,27 +102,3 @@
     color: white;
     font-family: 'Comic Sans MS', cursive, sans-serif;
 }
-
-/* Button styles */
-.restart-btn {
-    background: linear-gradient(45deg, #2E8B57, #3CB371);
-    border: none;
-    padding: 15px 30px;
-    border-radius: 25px;
-    color: white;
-    font-size: 18px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    margin-top: 20px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-}
-
-.restart-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-}
-
-.restart-btn:active {
-    transform: translateY(0);
-}

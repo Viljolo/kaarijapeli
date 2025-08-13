@@ -3,6 +3,27 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreElement = document.getElementById('score');
 
+// Test touch events globally
+document.addEventListener('touchstart', (e) => {
+    console.log('Global touchstart detected:', e.type, e.target);
+    initAudioContext();
+}, { passive: false });
+
+document.addEventListener('touchend', (e) => {
+    console.log('Global touchend detected:', e.type, e.target);
+}, { passive: false });
+
+// Add document click handler for audio context initialization
+document.addEventListener('click', (e) => {
+    console.log('Document click detected:', e.target);
+    initAudioContext();
+});
+
+document.addEventListener('keydown', (e) => {
+    console.log('Document keydown detected:', e.key);
+    initAudioContext();
+});
+
 // Game state
 let score = 0;
 let lives = 3;
@@ -16,8 +37,42 @@ let emeraldCollected = false;
 let levelComplete = false;
 let bossInvulnerable = false; // Add boss invulnerability after slide
 
+// Audio context and nodes
+let audioContext;
+let backgroundOscillator;
+let backgroundGain;
+let soundGain;
+
+// Initialize audio context after user interaction
+function initAudioContext() {
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        soundGain = audioContext.createGain();
+        soundGain.connect(audioContext.destination);
+        soundGain.gain.value = 0.3;
+    }
+    
+    if (audioContext.state === 'suspended') {
+        audioContext.resume();
+    }
+    
+    // Update audio status display
+    const audioStatus = document.getElementById('audioStatus');
+    if (audioStatus) {
+        if (audioContext.state === 'running') {
+            audioStatus.textContent = 'Audio: Ready';
+            audioStatus.style.color = '#2E8B57';
+        } else if (audioContext.state === 'suspended') {
+            audioStatus.textContent = 'Audio: Suspended - Click to resume';
+            audioStatus.style.color = '#ff6b6b';
+        } else {
+            audioStatus.textContent = 'Audio: Initializing...';
+            audioStatus.style.color = '#ffa500';
+        }
+    }
+}
+
 // Audio system
-const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 const audioBuffers = {};
 let backgroundMusic = null;
 let currentMusic = null;
@@ -348,9 +403,36 @@ function createBackgroundMusic() {
     };
 }
 
+// Start background music
 function startBackgroundMusic() {
-    if (isMuted || currentMusic) return;
-    currentMusic = createBackgroundMusic();
+    if (!audioContext) {
+        console.log('Audio context not ready, waiting for user interaction');
+        return;
+    }
+    
+    try {
+        backgroundOscillator = audioContext.createOscillator();
+        backgroundGain = audioContext.createGain();
+        
+        backgroundOscillator.type = 'sine';
+        backgroundOscillator.frequency.setValueAtTime(220, audioContext.currentTime);
+        backgroundOscillator.frequency.setValueAtTime(440, audioContext.currentTime + 2);
+        backgroundOscillator.frequency.setValueAtTime(330, audioContext.currentTime + 4);
+        
+        backgroundGain.gain.setValueAtTime(0.1, audioContext.currentTime);
+        backgroundGain.gain.setValueAtTime(0.05, audioContext.currentTime + 2);
+        
+        backgroundOscillator.connect(backgroundGain);
+        backgroundGain.connect(audioContext.destination);
+        
+        backgroundOscillator.start();
+        backgroundOscillator.stop(audioContext.currentTime + 6);
+        
+        // Loop the music
+        setTimeout(startBackgroundMusic, 6000);
+    } catch (error) {
+        console.log('Background music error:', error);
+    }
 }
 
 function stopBackgroundMusic() {
@@ -1502,6 +1584,17 @@ function checkPlatformCollision() {
 function updatePlayer() {
     if (isSliding || levelComplete) return;
     
+    // Debug touch controls state
+    if (touchControls.left || touchControls.right || touchControls.jump || touchControls.attack || touchControls.shield) {
+        console.log('Touch controls state:', {
+            left: touchControls.left,
+            right: touchControls.right,
+            jump: touchControls.jump,
+            attack: touchControls.attack,
+            shield: touchControls.shield
+        });
+    }
+    
     // Handle input (keyboard + touch)
     if (keys['ArrowLeft'] || keys['KeyA'] || touchControls.left) {
         player.velocityX = -player.speed;
@@ -1689,6 +1782,7 @@ function updateBoss() {
             if (boss.health <= 0) {
                 boss.isAlive = false;
                 score += 500; // Bonus points for defeating boss
+                updateDisplay();
                 playVictoryFanfare(); // Play special sound for boss defeat
             } else {
                 playEnemyHitSound();
@@ -1696,6 +1790,7 @@ function updateBoss() {
         } else if (boss.attackCooldown === 0 && !player.shieldActive) {
             // Boss is attacking the player (only if shield is not active)
             lives--;
+            updateDisplay();
             player.x = 50;
             player.y = 300;
             boss.attackCooldown = 60; // 1 second cooldown at 60fps
@@ -1720,6 +1815,7 @@ function updateCoins() {
         if (!coin.collected && checkCollision(player, coin)) {
             coin.collected = true;
             score += 100;
+            updateDisplay();
             
             // Play coin sound
             playCoinSound();
@@ -1779,6 +1875,7 @@ function updateHugeEmerald() {
             // Move to next level immediately after slide completes
             if (currentLevel < levels.length) {
                 currentLevel++;
+                updateDisplay();
                 loadLevel(currentLevel);
             } else {
                 // Game completed!
@@ -1818,6 +1915,7 @@ function updateHugeEmerald() {
 function loadLevel(levelNumber) {
     currentLevel = levelNumber;
     currentLevelData = levels[currentLevel - 1];
+    updateDisplay();
     
     // Only reset player position if not coming from a slide transition
     if (!isSliding && !levelComplete) {
@@ -1887,6 +1985,7 @@ function updateProjectiles() {
                 currentLevelData.enemies.splice(j, 1);
                 shouldRemoveNote = true;
                 score += 50;
+                updateDisplay();
                 playEnemyHitSound();
                 
                 // Create particle effect
@@ -1908,11 +2007,13 @@ function updateProjectiles() {
             boss.health--;
             shouldRemoveNote = true;
             score += 100;
+            updateDisplay();
             playEnemyHitSound();
             
             if (boss.health <= 0) {
                 boss.isAlive = false;
                 score += 500;
+                updateDisplay();
                 playVictoryFanfare();
             }
         }
@@ -1929,6 +2030,7 @@ function updateProjectiles() {
         if (checkCollision(fire, player) && !player.shieldActive) {
             // Player hit by fire
             lives--;
+            updateDisplay();
             player.x = 50;
             player.y = 300;
             bossProjectiles.splice(i, 1);
@@ -1945,7 +2047,12 @@ function updateProjectiles() {
 
 // Game loop
 function gameLoop() {
-    if (!gameRunning) {
+    if (gameRunning) {
+        updateGame();
+        renderGame();
+        updateDisplay();
+        requestAnimationFrame(gameLoop);
+    } else {
         // Game over or completion screen with enhanced graphics
         const overlayGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
         overlayGradient.addColorStop(0, 'rgba(0, 0, 0, 0.8)');
@@ -1980,15 +2087,11 @@ function gameLoop() {
         ctx.fillStyle = '#FF6B6B';
         ctx.font = '18px Comic Sans MS';
         ctx.fillText('Press F5 to restart', canvas.width/2, canvas.height/2 + 80);
-        return;
     }
-    
-    // Clear canvas with smooth clearing
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw background first
-    drawBackground();
-    
+}
+
+// Update game state
+function updateGame() {
     // Update game objects
     updatePlayer();
     updateEnemies();
@@ -2000,6 +2103,15 @@ function gameLoop() {
     
     // Reset touch controls to prevent stuck states
     resetTouchControls();
+}
+
+// Render game
+function renderGame() {
+    // Clear canvas with smooth clearing
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw background first
+    drawBackground();
     
     // Draw game objects in proper order
     drawPlatforms();
@@ -2017,8 +2129,11 @@ function gameLoop() {
         drawPlayer();
     }
     
-    // Continue game loop
-    requestAnimationFrame(gameLoop);
+    // Debug: Draw touch controls status on canvas
+    ctx.fillStyle = 'white';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Touch: L:${touchControls.left} R:${touchControls.right} J:${touchControls.jump} A:${touchControls.attack} S:${touchControls.shield}`, 10, 20);
 }
 
 // Enhanced input handling with audio controls
@@ -2041,6 +2156,8 @@ document.addEventListener('keyup', (e) => {
 
 // Restart game function
 function restartGame() {
+    console.log('restartGame called');
+    
     // Reset game state
     score = 0;
     lives = 3;
@@ -2051,6 +2168,8 @@ function restartGame() {
     bossInvulnerable = false;
     touchAttackCooldown = 0;
     
+    console.log('Game state reset, currentLevel:', currentLevel);
+    
     // Reset player
     player.x = 50;
     player.y = 300;
@@ -2059,27 +2178,84 @@ function restartGame() {
     player.attackCooldown = 0;
     player.shieldCooldown = 0;
     
+    console.log('Player reset to:', player.x, player.y);
+    
     // Reset boss
     boss.isAlive = true;
     boss.x = 700;
     boss.y = 200;
     boss.fireAttackCooldown = 0;
     
+    console.log('Boss reset, isAlive:', boss.isAlive);
+    
     // Clear arrays
-    enemies.length = 0;
-    coins.length = 0;
-    musicNotes.length = 0;
-    fireProjectiles.length = 0;
+    if (currentLevelData) {
+        console.log('Clearing currentLevelData arrays, enemies:', currentLevelData.enemies.length, 'coins:', currentLevelData.coins.length);
+        currentLevelData.enemies.length = 0;
+        currentLevelData.coins.length = 0;
+    } else {
+        console.log('currentLevelData is null/undefined!');
+    }
+    playerProjectiles.length = 0;
+    bossProjectiles.length = 0;
+    
+    console.log('About to call loadLevel(1)');
     
     // Load first level
     loadLevel(1);
     
+    console.log('loadLevel(1) completed, currentLevelData:', currentLevelData);
+    
+    // Ensure currentLevelData is properly set
+    currentLevelData = levels[0];
+    
+    console.log('currentLevelData set to levels[0]:', currentLevelData);
+    
     // Update score display
     updateScore();
+    
+    // Update display
+    updateDisplay();
+    
+    console.log('restartGame completed');
 }
 
 // Touch control event handlers
 function setupTouchControls() {
+    console.log('=== setupTouchControls START ===');
+    
+    // Initialize audio context on first user interaction
+    initAudioContext();
+    
+    // Test function to check button detection
+    function testButtonDetection() {
+        const buttons = ['leftBtn', 'rightBtn', 'jumpBtn', 'attackBtn', 'shieldBtn', 'restartBtn'];
+        buttons.forEach(id => {
+            const btn = document.getElementById(id);
+            console.log(`Button ${id}:`, btn);
+            if (btn) {
+                console.log(`- ${id} exists and has classes:`, btn.className);
+                console.log(`- ${id} is visible:`, btn.offsetWidth > 0 && btn.offsetHeight > 0);
+                console.log(`- ${id} computed style display:`, window.getComputedStyle(btn).display);
+            }
+        });
+    }
+
+    // Prevent default touch behaviors on the document for touch controls
+    document.addEventListener('touchstart', (e) => {
+        if (e.target.closest('.touch-controls')) {
+            e.preventDefault();
+        }
+        // Initialize audio on any touch
+        initAudioContext();
+    }, { passive: false });
+    
+    document.addEventListener('touchmove', (e) => {
+        if (e.target.closest('.touch-controls')) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
     const leftBtn = document.getElementById('leftBtn');
     const rightBtn = document.getElementById('rightBtn');
     const jumpBtn = document.getElementById('jumpBtn');
@@ -2087,72 +2263,129 @@ function setupTouchControls() {
     const shieldBtn = document.getElementById('shieldBtn');
     const restartBtn = document.getElementById('restartBtn');
     
+    console.log('setupTouchControls called');
+    console.log('Button elements found:');
+    console.log('- leftBtn:', leftBtn);
+    console.log('- rightBtn:', rightBtn);
+    console.log('- jumpBtn:', jumpBtn);
+    console.log('- attackBtn:', attackBtn);
+    console.log('- shieldBtn:', shieldBtn);
+    console.log('- restartBtn:', restartBtn);
+    
+    // Test button detection
+    testButtonDetection();
+
+    if (!leftBtn || !rightBtn || !jumpBtn || !attackBtn || !shieldBtn || !restartBtn) {
+        console.error('One or more touch control buttons not found!');
+        return;
+    }
+    
+    console.log('All buttons found, setting up event listeners...');
+    
+    // Test if buttons are clickable
+    [leftBtn, rightBtn, jumpBtn, attackBtn, shieldBtn, restartBtn].forEach((btn, index) => {
+        const names = ['leftBtn', 'rightBtn', 'jumpBtn', 'attackBtn', 'shieldBtn', 'restartBtn'];
+        btn.addEventListener('click', () => {
+            console.log(`${names[index]} clicked!`);
+            // Initialize audio on any click
+            initAudioContext();
+        });
+    });
+
     // Left button
     leftBtn.addEventListener('touchstart', (e) => {
+        console.log('leftBtn touchstart triggered');
         e.preventDefault();
+        e.stopPropagation();
         touchControls.left = true;
         leftBtn.style.transform = 'scale(0.9)';
-    });
+        initAudioContext();
+    }, { passive: false });
     leftBtn.addEventListener('touchend', (e) => {
+        console.log('leftBtn touchend triggered');
         e.preventDefault();
+        e.stopPropagation();
         touchControls.left = false;
         leftBtn.style.transform = 'scale(1)';
-    });
+    }, { passive: false });
     
     // Right button
     rightBtn.addEventListener('touchstart', (e) => {
+        console.log('rightBtn touchstart triggered');
         e.preventDefault();
+        e.stopPropagation();
         touchControls.right = true;
         rightBtn.style.transform = 'scale(0.9)';
-    });
+        initAudioContext();
+    }, { passive: false });
     rightBtn.addEventListener('touchend', (e) => {
+        console.log('rightBtn touchend triggered');
         e.preventDefault();
+        e.stopPropagation();
         touchControls.right = false;
         rightBtn.style.transform = 'scale(1)';
-    });
+    }, { passive: false });
     
     // Jump button
     jumpBtn.addEventListener('touchstart', (e) => {
+        console.log('jumpBtn touchstart triggered');
         e.preventDefault();
+        e.stopPropagation();
         touchControls.jump = true;
         jumpBtn.style.transform = 'scale(0.9)';
-    });
+        initAudioContext();
+    }, { passive: false });
     jumpBtn.addEventListener('touchend', (e) => {
+        console.log('jumpBtn touchend triggered');
         e.preventDefault();
+        e.stopPropagation();
         touchControls.jump = false;
         jumpBtn.style.transform = 'scale(1)';
-    });
+    }, { passive: false });
     
     // Attack button
     attackBtn.addEventListener('touchstart', (e) => {
+        console.log('attackBtn touchstart triggered');
         e.preventDefault();
+        e.stopPropagation();
         touchControls.attack = true;
         attackBtn.style.transform = 'scale(0.9)';
-    });
+        initAudioContext();
+    }, { passive: false });
     attackBtn.addEventListener('touchend', (e) => {
+        console.log('attackBtn touchend triggered');
         e.preventDefault();
+        e.stopPropagation();
         touchControls.attack = false;
         attackBtn.style.transform = 'scale(1)';
-    });
+    }, { passive: false });
     
     // Shield button
     shieldBtn.addEventListener('touchstart', (e) => {
+        console.log('shieldBtn touchstart triggered');
         e.preventDefault();
+        e.stopPropagation();
         touchControls.shield = true;
-        shieldBtn.style.transform = 'scale(0.9)';
-    });
+        shieldBtn.style.transform = 'scale(1.1)';
+        initAudioContext();
+    }, { passive: false });
     shieldBtn.addEventListener('touchend', (e) => {
+        console.log('shieldBtn touchend triggered');
         e.preventDefault();
+        e.stopPropagation();
         touchControls.shield = false;
         shieldBtn.style.transform = 'scale(1)';
-    });
+    }, { passive: false });
     
-    // Mouse events for desktop testing
+    // Mouse events for desktop testing (unchanged)
     leftBtn.addEventListener('mousedown', () => {
+        console.log('leftBtn mousedown triggered');
         touchControls.left = true;
         leftBtn.style.transform = 'scale(0.9)';
+        initAudioContext();
     });
     leftBtn.addEventListener('mouseup', () => {
+        console.log('leftBtn mouseup triggered');
         touchControls.left = false;
         leftBtn.style.transform = 'scale(1)';
     });
@@ -2162,10 +2395,13 @@ function setupTouchControls() {
     });
     
     rightBtn.addEventListener('mousedown', () => {
+        console.log('rightBtn mousedown triggered');
         touchControls.right = true;
         rightBtn.style.transform = 'scale(0.9)';
+        initAudioContext();
     });
     rightBtn.addEventListener('mouseup', () => {
+        console.log('rightBtn mouseup triggered');
         touchControls.right = false;
         rightBtn.style.transform = 'scale(1)';
     });
@@ -2175,10 +2411,13 @@ function setupTouchControls() {
     });
     
     jumpBtn.addEventListener('mousedown', () => {
+        console.log('jumpBtn mousedown triggered');
         touchControls.jump = true;
         jumpBtn.style.transform = 'scale(0.9)';
+        initAudioContext();
     });
     jumpBtn.addEventListener('mouseup', () => {
+        console.log('jumpBtn mouseup triggered');
         touchControls.jump = false;
         jumpBtn.style.transform = 'scale(1)';
     });
@@ -2188,10 +2427,13 @@ function setupTouchControls() {
     });
     
     attackBtn.addEventListener('mousedown', () => {
+        console.log('attackBtn mousedown triggered');
         touchControls.attack = true;
         attackBtn.style.transform = 'scale(0.9)';
+        initAudioContext();
     });
     attackBtn.addEventListener('mouseup', () => {
+        console.log('attackBtn mouseup triggered');
         touchControls.attack = false;
         attackBtn.style.transform = 'scale(1)';
     });
@@ -2201,10 +2443,13 @@ function setupTouchControls() {
     });
     
     shieldBtn.addEventListener('mousedown', () => {
+        console.log('shieldBtn mousedown triggered');
         touchControls.shield = true;
         shieldBtn.style.transform = 'scale(1.1)';
+        initAudioContext();
     });
     shieldBtn.addEventListener('mouseup', () => {
+        console.log('shieldBtn mouseup triggered');
         touchControls.shield = false;
         shieldBtn.style.transform = 'scale(1)';
     });
@@ -2215,26 +2460,36 @@ function setupTouchControls() {
     
     // Restart button
     restartBtn.addEventListener('touchstart', (e) => {
+        console.log('restartBtn touchstart triggered');
         e.preventDefault();
+        e.stopPropagation();
         restartBtn.style.transform = 'scale(0.9)';
-    });
+        initAudioContext();
+    }, { passive: false });
     restartBtn.addEventListener('touchend', (e) => {
+        console.log('restartBtn touchend triggered');
         e.preventDefault();
+        e.stopPropagation();
         restartBtn.style.transform = 'scale(1)';
         restartGame();
-    });
+    }, { passive: false });
     
-    // Mouse events for restart button
+    // Mouse events for restart button (unchanged)
     restartBtn.addEventListener('mousedown', () => {
+        console.log('restartBtn mousedown triggered');
         restartBtn.style.transform = 'scale(0.9)';
+        initAudioContext();
     });
     restartBtn.addEventListener('mouseup', () => {
+        console.log('restartBtn mouseup triggered');
         restartBtn.style.transform = 'scale(1)';
         restartGame();
     });
     restartBtn.addEventListener('mouseleave', () => {
         restartBtn.style.transform = 'scale(1)';
     });
+    
+    console.log('=== setupTouchControls COMPLETE ===');
 }
 
 // Reset touch controls to prevent stuck states
@@ -2249,8 +2504,29 @@ function resetTouchControls() {
     }
 }
 
-// Start the game
+// Initialize game
 loadLevel(1);
-startBackgroundMusic();
+updateDisplay(); // Initialize display
+console.log('About to call setupTouchControls');
 setupTouchControls();
+console.log('setupTouchControls called, starting game loop');
+
+// Start background music after a short delay to allow audio context to initialize
+setTimeout(() => {
+    if (audioContext && audioContext.state === 'running') {
+        startBackgroundMusic();
+    }
+}, 1000);
+
 gameLoop();
+
+// Update display
+function updateDisplay() {
+    const scoreElement = document.getElementById('score');
+    const livesElement = document.getElementById('lives');
+    const levelElement = document.getElementById('level');
+    
+    if (scoreElement) scoreElement.textContent = score;
+    if (livesElement) livesElement.textContent = lives;
+    if (levelElement) levelElement.textContent = currentLevel;
+}

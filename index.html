@@ -70,6 +70,19 @@
             color: #2E8B57;
         }
         
+        .audio-status {
+            color: #ff6b6b;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .score, .lives, .level {
+            color: #333;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        
         /* Touch Controls Styles */
         .touch-controls {
             margin-top: 15px;
@@ -77,6 +90,11 @@
             flex-direction: column;
             align-items: center;
             gap: 10px;
+            touch-action: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
         }
         
         .control-row {
@@ -167,6 +185,21 @@
             touch-action: manipulation;
         }
         
+        /* Prevent body scrolling on mobile */
+        body {
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Allow scrolling only in game container */
+        .game-container {
+            overflow-y: auto;
+            height: 100vh;
+            -webkit-overflow-scrolling: touch;
+        }
+        
         /* Disable text selection on mobile */
         body {
             -webkit-touch-callout: none;
@@ -183,7 +216,10 @@
         <h1>🎵 Käärijä 🎵</h1>
         <div class="subtitle">Help the Green Hero collect emeralds and reach the huge emerald!</div>
         <canvas id="gameCanvas" width="800" height="400"></canvas>
-        <div class="score" id="score">Level: 1 | Score: 0 | Lives: 3</div>
+        <div class="score">Score: <span id="score">0</span></div>
+        <div class="lives">Lives: <span id="lives">3</span></div>
+        <div class="level">Level: <span id="level">1</span></div>
+        <div class="audio-status" id="audioStatus">Audio: Waiting for interaction...</div>
         
         <!-- Touch Controls -->
         <div class="touch-controls">
