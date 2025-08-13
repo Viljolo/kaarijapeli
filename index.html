@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Käärijä - The Green Hero Adventure</title>
     <link rel="stylesheet" href="styles.css">
     <style>
@@ -66,6 +69,108 @@
             font-size: 12px;
             color: #2E8B57;
         }
+        
+        /* Touch Controls Styles */
+        .touch-controls {
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .control-row {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+        
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            border: none;
+            border-radius: 50%;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        
+        .control-btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .left-btn {
+            background: linear-gradient(135deg, #FF6B6B, #FF8E8E);
+            color: white;
+        }
+        
+        .jump-btn {
+            background: linear-gradient(135deg, #4ECDC4, #6EDDD6);
+            color: white;
+        }
+        
+        .right-btn {
+            background: linear-gradient(135deg, #FF6B6B, #FF8E8E);
+            color: white;
+        }
+        
+        .attack-btn {
+            background: linear-gradient(135deg, #FFD93D, #FFE66D);
+            color: #333;
+        }
+        
+        .shield-btn {
+            background: linear-gradient(135deg, #6C5CE7, #8B7CF6);
+            color: white;
+        }
+        
+        /* Hide touch controls on desktop */
+        @media (min-width: 1024px) {
+            .touch-controls {
+                display: none;
+            }
+        }
+        
+        /* Mobile-specific improvements */
+        @media (max-width: 768px) {
+            .control-btn {
+                width: 70px;
+                height: 70px;
+                font-size: 28px;
+            }
+            
+            .game-container {
+                padding: 15px;
+                margin: 10px;
+            }
+            
+            #gameCanvas {
+                max-width: 100%;
+                height: auto;
+            }
+        }
+        
+        /* Prevent text selection and improve touch */
+        .control-btn {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        
+        /* Disable text selection on mobile */
+        body {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
     </style>
 </head>
 <body>
@@ -74,8 +179,22 @@
         <div class="subtitle">Help the Green Hero collect emeralds and reach the huge emerald!</div>
         <canvas id="gameCanvas" width="800" height="400"></canvas>
         <div class="score" id="score">Level: 1 | Score: 0 | Lives: 3</div>
+        
+        <!-- Touch Controls -->
+        <div class="touch-controls">
+            <div class="control-row">
+                <button id="leftBtn" class="control-btn left-btn">←</button>
+                <button id="jumpBtn" class="control-btn jump-btn">↑</button>
+                <button id="rightBtn" class="control-btn right-btn">→</button>
+            </div>
+            <div class="control-row">
+                <button id="attackBtn" class="control-btn attack-btn">⚔️</button>
+                <button id="shieldBtn" class="control-btn shield-btn">🛡️</button>
+            </div>
+        </div>
+        
         <div class="controls">
-            <strong>Controls:</strong> Arrow Keys to move, Space to jump
+            <strong>Controls:</strong> Arrow Keys to move, Space to jump | Touch buttons for mobile
         </div>
         <div class="audio-info">
             🎵 <strong>Audio:</strong> Press 'M' to mute/unmute | Enjoy the groovy beats!

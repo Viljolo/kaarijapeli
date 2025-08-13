@@ -14,6 +14,7 @@ let slideProgress = 0;
 let slideSpeed = 0.02;
 let emeraldCollected = false;
 let levelComplete = false;
+let bossInvulnerable = false; // Add boss invulnerability after slide
 
 // Audio system
 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -61,26 +62,27 @@ class DeathPit {
 
 // Projectile class for music notes
 class MusicNote {
-    constructor(x, y, direction, speed = 5) {
+    constructor(x, y, direction, speed = 3) { // Reduced speed from 5 to 3
         this.x = x;
         this.y = y;
         this.width = 8;
         this.height = 8;
         this.direction = direction;
         this.speed = speed;
-        this.life = 60; // 1 second at 60fps
+        this.life = 90; // Increased life from 60 to 90 (1.5 seconds)
         this.animation = 0;
     }
 }
 
 // Fire projectile class for boss
 class FireProjectile {
-    constructor(x, y, direction, speed = 3) {
+    constructor(x, y, directionX, directionY = 0, speed = 2) { // Added directionY parameter
         this.x = x;
         this.y = y;
         this.width = 12;
         this.height = 12;
-        this.direction = direction;
+        this.directionX = directionX;
+        this.directionY = directionY;
         this.speed = speed;
         this.life = 120; // 2 seconds at 60fps
         this.animation = 0;
@@ -469,11 +471,11 @@ const levels = [
         ],
         trampolines: [
             new Trampoline(350, 320, 60, 10),
-            new Trampoline(750, 270, 60, 10)
+            new Trampoline(750, 320, 60, 10)
         ],
         deathPits: [
-            new DeathPit(150, 360, 40, 40),
-            new DeathPit(450, 360, 40, 40)
+            new DeathPit(150, 350, 40, 50), // Fixed positioning - y should be 350 (ground level), height 50 to extend below ground
+            new DeathPit(450, 350, 40, 50)  // Fixed positioning - y should be 350 (ground level), height 50 to extend below ground
         ]
     },
     // Level 2 - Adventure (Extended)
@@ -511,13 +513,13 @@ const levels = [
         ],
         trampolines: [
             new Trampoline(250, 330, 60, 10),
-            new Trampoline(550, 270, 60, 10),
-            new Trampoline(850, 210, 60, 10)
+            new Trampoline(550, 330, 60, 10),
+            new Trampoline(850, 330, 60, 10)
         ],
         deathPits: [
-            new DeathPit(100, 360, 40, 40),
-            new DeathPit(350, 360, 40, 40),
-            new DeathPit(600, 360, 40, 40)
+            new DeathPit(100, 350, 40, 50), // Fixed positioning
+            new DeathPit(350, 350, 40, 50), // Fixed positioning
+            new DeathPit(600, 350, 40, 50)  // Fixed positioning
         ]
     },
     // Level 3 - Challenge (Extended)
@@ -560,15 +562,15 @@ const levels = [
         ],
         trampolines: [
             new Trampoline(200, 330, 60, 10),
-            new Trampoline(500, 280, 60, 10),
-            new Trampoline(800, 230, 60, 10),
-            new Trampoline(1100, 280, 60, 10)
+            new Trampoline(500, 330, 60, 10),
+            new Trampoline(800, 330, 60, 10),
+            new Trampoline(1100, 330, 60, 10)
         ],
         deathPits: [
-            new DeathPit(200, 360, 40, 40),
-            new DeathPit(500, 360, 40, 40),
-            new DeathPit(800, 360, 40, 40),
-            new DeathPit(1100, 360, 40, 40)
+            new DeathPit(200, 350, 40, 50), // Fixed positioning
+            new DeathPit(500, 350, 40, 50), // Fixed positioning
+            new DeathPit(800, 350, 40, 50), // Fixed positioning
+            new DeathPit(1100, 350, 40, 50) // Fixed positioning
         ]
     }
 ];
@@ -581,6 +583,18 @@ const particles = [];
 
 // Input handling
 const keys = {};
+
+// Touch control state
+const touchControls = {
+    left: false,
+    right: false,
+    jump: false,
+    attack: false,
+    shield: false
+};
+
+// Touch attack cooldown to prevent rapid-fire
+let touchAttackCooldown = 0;
 
 // Physics constants
 const gravity = 0.5;
@@ -986,6 +1000,15 @@ function drawBoss() {
     ctx.lineWidth = 1;
     ctx.strokeRect(-healthBarWidth/2, -70, healthBarWidth, healthBarHeight);
     
+    // Show invulnerability indicator
+    if (bossInvulnerable) {
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.5)';
+        ctx.fillRect(-25, -30, 50, 60);
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(-25, -30, 50, 60);
+    }
+    
     ctx.restore();
 }
 
@@ -1080,8 +1103,13 @@ function drawDeathPits() {
         }
         
         // Glowing effect
-        ctx.fillStyle = `rgba(255, 0, 0, ${0.2 + Math.sin(pit.animation) * 0.1})`;
+        ctx.fillStyle = `rgba(255, 0, 0, ${0.3 + Math.sin(pit.animation) * 0.2})`;
         ctx.fillRect(-pit.width/2, -pit.height/2, pit.width, pit.height);
+        
+        // Warning border
+        ctx.strokeStyle = `rgba(255, 0, 0, ${0.8 + Math.sin(pit.animation) * 0.2})`;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-pit.width/2, -pit.height/2, pit.width, pit.height);
         
         ctx.restore();
     });
@@ -1132,7 +1160,8 @@ function drawFireProjectiles() {
     for (let i = bossProjectiles.length - 1; i >= 0; i--) {
         const fire = bossProjectiles[i];
         fire.life -= 1;
-        fire.x += fire.direction * fire.speed;
+        fire.x += fire.directionX * fire.speed;
+        fire.y += fire.directionY * fire.speed;
         fire.animation += 0.3;
         
         if (fire.life > 0) {
@@ -1446,7 +1475,12 @@ function checkPlatformCollision() {
     // Check death pit collisions
     if (currentLevelData.deathPits) {
         currentLevelData.deathPits.forEach(pit => {
-            if (checkCollision(player, pit)) {
+            // More precise collision detection for death pits
+            if (player.x < pit.x + pit.width &&
+                player.x + player.width > pit.x &&
+                player.y < pit.y + pit.height &&
+                player.y + player.height > pit.y) {
+                
                 lives--;
                 player.x = 50;
                 player.y = 300;
@@ -1466,13 +1500,13 @@ function checkPlatformCollision() {
 
 // Game logic
 function updatePlayer() {
-    if (isSliding) return;
+    if (isSliding || levelComplete) return;
     
-    // Handle input
-    if (keys['ArrowLeft'] || keys['KeyA']) {
+    // Handle input (keyboard + touch)
+    if (keys['ArrowLeft'] || keys['KeyA'] || touchControls.left) {
         player.velocityX = -player.speed;
         player.direction = -1;
-    } else if (keys['ArrowRight'] || keys['KeyD']) {
+    } else if (keys['ArrowRight'] || keys['KeyD'] || touchControls.right) {
         player.velocityX = player.speed;
         player.direction = 1;
     } else {
@@ -1480,29 +1514,30 @@ function updatePlayer() {
     }
     
     // Jumping
-    if ((keys['ArrowUp'] || keys['KeyW'] || keys['Space']) && player.onGround) {
+    if ((keys['ArrowUp'] || keys['KeyW'] || keys['Space'] || touchControls.jump) && player.onGround) {
         player.velocityY = -player.jumpPower;
         player.onGround = false;
         player.isJumping = true;
         playJumpSound();
     }
     
-    // Sword attack (Space or X key)
-    if ((keys['KeyX'] || keys['KeyZ']) && player.attackCooldown === 0 && player.hasSword) {
+    // Sword attack (Space, X key, or touch)
+    if ((keys['KeyX'] || keys['KeyZ'] || (touchControls.attack && touchAttackCooldown === 0)) && player.attackCooldown === 0 && player.hasSword) {
         // Create music note projectile
         const projectileX = player.x + (player.direction === 1 ? player.width : 0);
         const projectileY = player.y + player.height/2;
         playerProjectiles.push(new MusicNote(projectileX, projectileY, player.direction));
         
-        player.attackCooldown = 15; // 0.25 seconds at 60fps
+        player.attackCooldown = 30; // 0.5 seconds at 60fps (doubled cooldown)
+        touchAttackCooldown = 10; // Small delay for touch attacks
         player.isAttacking = true;
         
         // Play attack sound
         playCoinSound();
     }
     
-    // Shield block (S key)
-    if (keys['KeyS'] && player.hasShield) {
+    // Shield block (S key or touch)
+    if (keys['KeyS'] || touchControls.shield) {
         player.shieldActive = true;
     } else {
         player.shieldActive = false;
@@ -1550,7 +1585,7 @@ function updatePlayer() {
 }
 
 function updateEnemies() {
-    if (isSliding) return;
+    if (isSliding || levelComplete) return;
     
     currentLevelData.enemies.forEach(enemy => {
         enemy.x += enemy.velocityX;
@@ -1577,7 +1612,7 @@ function updateEnemies() {
 }
 
 function updateBoss() {
-    if (!boss.isAlive || isSliding) return;
+    if (!boss.isAlive || isSliding || levelComplete) return;
     
     // Update boss position with better movement
     boss.x += boss.velocityX;
@@ -1621,20 +1656,30 @@ function updateBoss() {
         boss.fireAttackCooldown--;
     }
     
-    // Fire projectile attack from microphone
+    // Fire projectile attack from microphone - shoot in multiple directions
     if (boss.hasMicrophone && boss.fireAttackCooldown === 0 && distanceToPlayer < boss.attackRange) {
         const fireX = boss.x + (boss.direction === 1 ? boss.width : 0);
         const fireY = boss.y + boss.height/2;
-        bossProjectiles.push(new FireProjectile(fireX, fireY, boss.direction));
         
-        boss.fireAttackCooldown = 60; // 1 second at 60fps
+        // Shoot in multiple directions: horizontal, diagonal up, diagonal down
+        const directions = [
+            { x: boss.direction, y: 0 },           // Horizontal
+            { x: boss.direction * 0.7, y: -0.7 }, // Diagonal up
+            { x: boss.direction * 0.7, y: 0.7 }   // Diagonal down
+        ];
+        
+        directions.forEach(dir => {
+            bossProjectiles.push(new FireProjectile(fireX, fireY, dir.x, dir.y));
+        });
+        
+        boss.fireAttackCooldown = 90; // 1.5 seconds at 60fps (increased cooldown)
         
         // Play fire attack sound
         playEnemyHitSound();
     }
     
     // Check collision with player
-    if (checkCollision(player, boss)) {
+    if (checkCollision(player, boss) && !bossInvulnerable) {
         // Check if player is attacking from above (jumping on boss)
         if (player.velocityY > 0 && player.y < boss.y - 10) {
             // Player is attacking the boss
@@ -1669,7 +1714,7 @@ function updateBoss() {
 }
 
 function updateCoins() {
-    if (isSliding) return;
+    if (isSliding || levelComplete) return;
     
     currentLevelData.coins.forEach(coin => {
         if (!coin.collected && checkCollision(player, coin)) {
@@ -1699,54 +1744,42 @@ function updateHugeEmerald() {
         hugeEmerald.y += hugeEmerald.fallSpeed;
         hugeEmerald.fallSpeed += 0.5;
         
+        // Move player along with the slide to the next level's beginning
+        if (slideProgress < 1) {
+            // Calculate target position (next level's beginning)
+            const targetX = 50;
+            const targetY = 300;
+            
+            // Smoothly move player to the target position during slide
+            const easeProgress = slideProgress * slideProgress * (3 - 2 * slideProgress); // Smooth easing
+            player.x = player.x + (targetX - player.x) * 0.1;
+            player.y = player.y + (targetY - player.y) * 0.1;
+        }
+        
         if (slideProgress >= 1) {
             // Level complete!
             levelComplete = true;
             isSliding = false;
             slideProgress = 0;
             
+            // Ensure player is exactly at the next level's starting position
+            player.x = 50;
+            player.y = 300;
+            player.velocityX = 0;
+            player.velocityY = 0;
+            
+            // Keep boss invulnerable for a short time after slide
+            setTimeout(() => {
+                bossInvulnerable = false;
+            }, 2000); // 2 seconds of invulnerability after slide
+            
             // Play level complete sound
             playLevelCompleteSound();
             
-            // Move to next level with smooth transition
+            // Move to next level immediately after slide completes
             if (currentLevel < levels.length) {
-                setTimeout(() => {
-                    // Add transition effect
-                    const transitionOverlay = document.createElement('div');
-                    transitionOverlay.style.position = 'absolute';
-                    transitionOverlay.style.top = '0';
-                    transitionOverlay.style.left = '0';
-                    transitionOverlay.style.width = '100%';
-                    transitionOverlay.style.height = '100%';
-                    transitionOverlay.style.background = 'linear-gradient(45deg, #00C957, #32CD32)';
-                    transitionOverlay.style.opacity = '0';
-                    transitionOverlay.style.transition = 'opacity 0.5s ease-in-out';
-                    transitionOverlay.style.zIndex = '1000';
-                    transitionOverlay.style.display = 'flex';
-                    transitionOverlay.style.alignItems = 'center';
-                    transitionOverlay.style.justifyContent = 'center';
-                    transitionOverlay.style.fontSize = '24px';
-                    transitionOverlay.style.color = 'white';
-                    transitionOverlay.style.fontWeight = 'bold';
-                    transitionOverlay.textContent = `Level ${currentLevel} Complete!`;
-                    
-                    document.body.appendChild(transitionOverlay);
-                    
-                    // Fade in
-                    setTimeout(() => {
-                        transitionOverlay.style.opacity = '1';
-                    }, 10);
-                    
-                    // Fade out and load next level
-                    setTimeout(() => {
-                        transitionOverlay.style.opacity = '0';
-                        setTimeout(() => {
-                            document.body.removeChild(transitionOverlay);
-                            currentLevel++;
-                            loadLevel(currentLevel);
-                        }, 500);
-                    }, 1500);
-                }, 500);
+                currentLevel++;
+                loadLevel(currentLevel);
             } else {
                 // Game completed!
                 setTimeout(() => {
@@ -1762,6 +1795,9 @@ function updateHugeEmerald() {
         hugeEmerald.falling = true;
         hugeEmerald.slideX = hugeEmerald.x + hugeEmerald.width/2;
         hugeEmerald.fallSpeed = 2;
+        
+        // Make boss invulnerable during slide transition
+        bossInvulnerable = true;
         
         // Play emerald collect sound
         playEmeraldCollectSound();
@@ -1783,11 +1819,13 @@ function loadLevel(levelNumber) {
     currentLevel = levelNumber;
     currentLevelData = levels[currentLevel - 1];
     
-    // Reset player position
-    player.x = 50;
-    player.y = 300;
-    player.velocityX = 0;
-    player.velocityY = 0;
+    // Only reset player position if not coming from a slide transition
+    if (!isSliding && !levelComplete) {
+        player.x = 50;
+        player.y = 300;
+        player.velocityX = 0;
+        player.velocityY = 0;
+    }
     
     // Reset huge emerald - position it based on the highest platform or a good location
     let highestPlatform = { y: 350 };
@@ -1820,6 +1858,7 @@ function loadLevel(levelNumber) {
     isSliding = false;
     slideProgress = 0;
     levelComplete = false;
+    bossInvulnerable = false; // Reset boss invulnerability
     
     // Clear particles and projectiles
     particles.length = 0;
@@ -1959,6 +1998,9 @@ function gameLoop() {
     updateProjectiles();
     updateScore();
     
+    // Reset touch controls to prevent stuck states
+    resetTouchControls();
+    
     // Draw game objects in proper order
     drawPlatforms();
     drawTrampolines();
@@ -1997,7 +2039,155 @@ document.addEventListener('keyup', (e) => {
     keys[e.code] = false;
 });
 
+// Touch control event handlers
+function setupTouchControls() {
+    const leftBtn = document.getElementById('leftBtn');
+    const rightBtn = document.getElementById('rightBtn');
+    const jumpBtn = document.getElementById('jumpBtn');
+    const attackBtn = document.getElementById('attackBtn');
+    const shieldBtn = document.getElementById('shieldBtn');
+    
+    // Left button
+    leftBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        touchControls.left = true;
+        leftBtn.style.transform = 'scale(0.9)';
+    });
+    leftBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        touchControls.left = false;
+        leftBtn.style.transform = 'scale(1)';
+    });
+    
+    // Right button
+    rightBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        touchControls.right = true;
+        rightBtn.style.transform = 'scale(0.9)';
+    });
+    rightBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        touchControls.right = false;
+        rightBtn.style.transform = 'scale(1)';
+    });
+    
+    // Jump button
+    jumpBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        touchControls.jump = true;
+        jumpBtn.style.transform = 'scale(0.9)';
+    });
+    jumpBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        touchControls.jump = false;
+        jumpBtn.style.transform = 'scale(1)';
+    });
+    
+    // Attack button
+    attackBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        touchControls.attack = true;
+        attackBtn.style.transform = 'scale(0.9)';
+    });
+    attackBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        touchControls.attack = false;
+        attackBtn.style.transform = 'scale(1)';
+    });
+    
+    // Shield button
+    shieldBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        touchControls.shield = true;
+        shieldBtn.style.transform = 'scale(0.9)';
+    });
+    shieldBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        touchControls.shield = false;
+        shieldBtn.style.transform = 'scale(1)';
+    });
+    
+    // Mouse events for desktop testing
+    leftBtn.addEventListener('mousedown', () => {
+        touchControls.left = true;
+        leftBtn.style.transform = 'scale(0.9)';
+    });
+    leftBtn.addEventListener('mouseup', () => {
+        touchControls.left = false;
+        leftBtn.style.transform = 'scale(1)';
+    });
+    leftBtn.addEventListener('mouseleave', () => {
+        touchControls.left = false;
+        leftBtn.style.transform = 'scale(1)';
+    });
+    
+    rightBtn.addEventListener('mousedown', () => {
+        touchControls.right = true;
+        rightBtn.style.transform = 'scale(0.9)';
+    });
+    rightBtn.addEventListener('mouseup', () => {
+        touchControls.right = false;
+        rightBtn.style.transform = 'scale(1)';
+    });
+    rightBtn.addEventListener('mouseleave', () => {
+        touchControls.right = false;
+        rightBtn.style.transform = 'scale(1)';
+    });
+    
+    jumpBtn.addEventListener('mousedown', () => {
+        touchControls.jump = true;
+        jumpBtn.style.transform = 'scale(0.9)';
+    });
+    jumpBtn.addEventListener('mouseup', () => {
+        touchControls.jump = false;
+        jumpBtn.style.transform = 'scale(1)';
+    });
+    jumpBtn.addEventListener('mouseleave', () => {
+        touchControls.jump = false;
+        jumpBtn.style.transform = 'scale(1)';
+    });
+    
+    attackBtn.addEventListener('mousedown', () => {
+        touchControls.attack = true;
+        attackBtn.style.transform = 'scale(0.9)';
+    });
+    attackBtn.addEventListener('mouseup', () => {
+        touchControls.attack = false;
+        attackBtn.style.transform = 'scale(1)';
+    });
+    attackBtn.addEventListener('mouseleave', () => {
+        touchControls.attack = false;
+        attackBtn.style.transform = 'scale(1)';
+    });
+    
+    shieldBtn.addEventListener('mousedown', () => {
+        touchControls.shield = true;
+        shieldBtn.style.transform = 'scale(1.1)';
+    });
+    shieldBtn.addEventListener('mouseup', () => {
+        touchControls.shield = false;
+        shieldBtn.style.transform = 'scale(1)';
+    });
+    shieldBtn.addEventListener('mouseleave', () => {
+        touchControls.shield = false;
+        shieldBtn.style.transform = 'scale(1)';
+    });
+}
+
+// Reset touch controls to prevent stuck states
+function resetTouchControls() {
+    // Reset attack and shield to prevent them from getting stuck
+    touchControls.attack = false;
+    touchControls.shield = false;
+    
+    // Update touch attack cooldown
+    if (touchAttackCooldown > 0) {
+        touchAttackCooldown--;
+    }
+}
+
 // Start the game
 loadLevel(1);
 startBackgroundMusic();
+setupTouchControls();
 gameLoop();
