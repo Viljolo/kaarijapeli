@@ -2039,6 +2039,45 @@ document.addEventListener('keyup', (e) => {
     keys[e.code] = false;
 });
 
+// Restart game function
+function restartGame() {
+    // Reset game state
+    score = 0;
+    lives = 3;
+    currentLevel = 1;
+    gameRunning = true;
+    isSliding = false;
+    levelComplete = false;
+    bossInvulnerable = false;
+    touchAttackCooldown = 0;
+    
+    // Reset player
+    player.x = 50;
+    player.y = 300;
+    player.velocityX = 0;
+    player.velocityY = 0;
+    player.attackCooldown = 0;
+    player.shieldCooldown = 0;
+    
+    // Reset boss
+    boss.isAlive = true;
+    boss.x = 700;
+    boss.y = 200;
+    boss.fireAttackCooldown = 0;
+    
+    // Clear arrays
+    enemies.length = 0;
+    coins.length = 0;
+    musicNotes.length = 0;
+    fireProjectiles.length = 0;
+    
+    // Load first level
+    loadLevel(1);
+    
+    // Update score display
+    updateScore();
+}
+
 // Touch control event handlers
 function setupTouchControls() {
     const leftBtn = document.getElementById('leftBtn');
@@ -2046,6 +2085,7 @@ function setupTouchControls() {
     const jumpBtn = document.getElementById('jumpBtn');
     const attackBtn = document.getElementById('attackBtn');
     const shieldBtn = document.getElementById('shieldBtn');
+    const restartBtn = document.getElementById('restartBtn');
     
     // Left button
     leftBtn.addEventListener('touchstart', (e) => {
@@ -2171,6 +2211,29 @@ function setupTouchControls() {
     shieldBtn.addEventListener('mouseleave', () => {
         touchControls.shield = false;
         shieldBtn.style.transform = 'scale(1)';
+    });
+    
+    // Restart button
+    restartBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        restartBtn.style.transform = 'scale(0.9)';
+    });
+    restartBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        restartBtn.style.transform = 'scale(1)';
+        restartGame();
+    });
+    
+    // Mouse events for restart button
+    restartBtn.addEventListener('mousedown', () => {
+        restartBtn.style.transform = 'scale(0.9)';
+    });
+    restartBtn.addEventListener('mouseup', () => {
+        restartBtn.style.transform = 'scale(1)';
+        restartGame();
+    });
+    restartBtn.addEventListener('mouseleave', () => {
+        restartBtn.style.transform = 'scale(1)';
     });
 }
 
