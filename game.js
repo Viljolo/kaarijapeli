@@ -2101,8 +2101,10 @@ function updateGame() {
     updateProjectiles();
     updateScore();
     
-    // Reset touch controls to prevent stuck states
-    resetTouchControls();
+    // Update touch attack cooldown (but don't reset controls every frame)
+    if (touchAttackCooldown > 0) {
+        touchAttackCooldown--;
+    }
 }
 
 // Render game
@@ -2167,6 +2169,8 @@ function restartGame() {
     levelComplete = false;
     bossInvulnerable = false;
     touchAttackCooldown = 0;
+    emeraldCollected = false;
+    gameStartTime = Date.now();
     
     console.log('Game state reset, currentLevel:', currentLevel);
     
@@ -2185,8 +2189,24 @@ function restartGame() {
     boss.x = 700;
     boss.y = 200;
     boss.fireAttackCooldown = 0;
+    boss.health = 3;
+    boss.maxHealth = 3;
+    boss.velocityX = -1;
+    boss.direction = -1;
+    boss.attackCooldown = 0;
+    boss.animationFrame = 0;
     
     console.log('Boss reset, isAlive:', boss.isAlive);
+    
+    // Reset huge emerald completely
+    hugeEmerald.x = 750;
+    hugeEmerald.y = 50;
+    hugeEmerald.collected = false;
+    hugeEmerald.falling = false;
+    hugeEmerald.fallSpeed = 0;
+    hugeEmerald.slideX = 0;
+    
+    console.log('Huge emerald reset');
     
     // Clear arrays
     if (currentLevelData) {
@@ -2198,6 +2218,7 @@ function restartGame() {
     }
     playerProjectiles.length = 0;
     bossProjectiles.length = 0;
+    particles.length = 0;
     
     console.log('About to call loadLevel(1)');
     
@@ -2210,9 +2231,21 @@ function restartGame() {
     currentLevelData = levels[0];
     
     console.log('currentLevelData set to levels[0]:', currentLevelData);
+    console.log('levels array length:', levels.length);
+    console.log('levels[0] platforms:', levels[0].platforms.length);
+    
+    // Force player position reset after loadLevel to ensure it happens
+    player.x = 50;
+    player.y = 300;
+    player.velocityX = 0;
+    player.velocityY = 0;
+    console.log('Player position forced reset to:', player.x, player.y);
     
     // Update score display
     updateScore();
+    
+    // Reset touch controls
+    resetTouchControls();
     
     // Update display
     updateDisplay();
@@ -2243,8 +2276,10 @@ function setupTouchControls() {
 
     // Prevent default touch behaviors on the document for touch controls
     document.addEventListener('touchstart', (e) => {
+        console.log('Global touchstart detected:', e.type, e.target);
         if (e.target.closest('.touch-controls')) {
             e.preventDefault();
+            console.log('Touch controls touchstart prevented');
         }
         // Initialize audio on any touch
         initAudioContext();
@@ -2254,6 +2289,10 @@ function setupTouchControls() {
         if (e.target.closest('.touch-controls')) {
             e.preventDefault();
         }
+    }, { passive: false });
+    
+    document.addEventListener('touchend', (e) => {
+        console.log('Global touchend detected:', e.type, e.target);
     }, { passive: false });
     
     const leftBtn = document.getElementById('leftBtn');
@@ -2289,6 +2328,14 @@ function setupTouchControls() {
             console.log(`${names[index]} clicked!`);
             // Initialize audio on any click
             initAudioContext();
+        });
+        
+        // Add a visual test - change background color on click
+        btn.addEventListener('mousedown', () => {
+            btn.style.backgroundColor = '#ff0000';
+        });
+        btn.addEventListener('mouseup', () => {
+            btn.style.backgroundColor = '';
         });
     });
 
@@ -2494,14 +2541,12 @@ function setupTouchControls() {
 
 // Reset touch controls to prevent stuck states
 function resetTouchControls() {
-    // Reset attack and shield to prevent them from getting stuck
+    // Reset all touch controls to prevent them from getting stuck
+    touchControls.left = false;
+    touchControls.right = false;
+    touchControls.jump = false;
     touchControls.attack = false;
     touchControls.shield = false;
-    
-    // Update touch attack cooldown
-    if (touchAttackCooldown > 0) {
-        touchAttackCooldown--;
-    }
 }
 
 // Initialize game
